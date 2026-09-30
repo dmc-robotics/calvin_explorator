@@ -17,13 +17,20 @@ struct CogitatorEndpoint: Equatable {
 
     /// The gateway's `ws://` URL, or nil when host and port don't form a usable address
     var url: URL? {
-        guard !host.isEmpty,
-              !host.contains(where: \.isWhitespace),
+        guard isValidHost,
               Self.validPorts.contains(port),
               let url = URL(string: "ws://\(host):\(port)"),
-              url.host() != nil
+              url.port == port,
+              url.path().isEmpty
         else { return nil }
         return url
+    }
+
+    /// A hostname or IPv4 address (letters, digits, dots, hyphens), or an IPv6 address in brackets.
+    /// Rules out anything that would change the URL's meaning, like `/`, `@`, `?` or a scheme
+    private var isValidHost: Bool {
+        host.wholeMatch(of: /[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?/) != nil
+            || host.wholeMatch(of: /\[[0-9A-Fa-f:.]+\]/) != nil
     }
 
     var displayName: String { "\(host):\(port)" }
