@@ -14,6 +14,12 @@ struct LoggerView: View {
                 Text(log.isPaused ? "Paused" : "\(log.entries.count) messages")
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                if model.droppedMessageCount > 0 {
+                    Text("\(model.droppedMessageCount) dropped")
+                        .foregroundStyle(.orange)
+                        .monospacedDigit()
+                        .help("Messages dropped because the app fell behind")
+                }
                 Spacer()
                 TextField("Filter", text: $filter, prompt: Text("Filter messages"))
                     .textFieldStyle(.roundedBorder)

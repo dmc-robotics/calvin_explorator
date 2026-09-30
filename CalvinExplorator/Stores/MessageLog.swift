@@ -20,6 +20,8 @@ struct LogEntry: Identifiable {
 final class MessageLog {
     /// Oldest entries are dropped beyond this many
     static let maxEntries = 5000
+    /// Longer messages are shortened to this many characters (real telemetry is ~150)
+    static let maxTextLength = 4096
 
     private(set) var entries: [LogEntry] = []
     /// While paused, new messages aren't recorded
@@ -29,7 +31,7 @@ final class MessageLog {
 
     func record(_ direction: LogEntry.Direction, _ text: String, at time: Date = .now) {
         guard !isPaused else { return }
-        entries.append(LogEntry(id: nextID, time: time, direction: direction, text: text))
+        entries.append(LogEntry(id: nextID, time: time, direction: direction, text: Self.truncated(text)))
         nextID += 1
         if entries.count > Self.maxEntries {
             entries.removeFirst(entries.count - Self.maxEntries)
@@ -38,5 +40,10 @@ final class MessageLog {
 
     func clear() {
         entries.removeAll()
+    }
+
+    static func truncated(_ text: String) -> String {
+        guard text.count > maxTextLength else { return text }
+        return "\(text.prefix(maxTextLength))… (\(text.count - maxTextLength) more characters)"
     }
 }

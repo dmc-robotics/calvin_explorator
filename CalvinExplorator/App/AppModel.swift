@@ -7,6 +7,8 @@ final class AppModel {
     /// Received messages are applied in batches this often, so the UI redraws at this rate
     /// rather than once per message (instinctus alone sends 50 per second)
     static let refreshInterval: Duration = .milliseconds(100)
+    /// Received messages waiting for the next batch beyond this many are dropped, oldest first
+    static let maxPendingMessages = 2000
 
     private static let selectedPageKey = "selectedPage"
 
@@ -23,6 +25,8 @@ final class AppModel {
     }
     var isStopAlertPresented = false
     private(set) var endpoint: CogitatorEndpoint
+    /// Received messages dropped because the UI fell too far behind
+    private(set) var droppedMessageCount = 0
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var pendingMessages: [(text: String, time: Date)] = []
@@ -85,6 +89,11 @@ final class AppModel {
     /// Queues a message, keeping its arrival time, and schedules a flush if none is pending
     func receive(_ text: String) {
         pendingMessages.append((text, .now))
+        if pendingMessages.count > Self.maxPendingMessages {
+            let overflow = pendingMessages.count - Self.maxPendingMessages
+            pendingMessages.removeFirst(overflow)
+            droppedMessageCount += overflow
+        }
         guard flushTask == nil else { return }
         flushTask = Task {
             try? await Task.sleep(for: Self.refreshInterval)

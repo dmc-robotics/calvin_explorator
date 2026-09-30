@@ -18,4 +18,13 @@ struct MessageLogTests {
         log.record(.sent, "ignored")
         #expect(log.entries.isEmpty)
     }
+
+    @Test func shortensHugeMessages() throws {
+        let log = MessageLog()
+        log.record(.received, String(repeating: "x", count: MessageLog.maxTextLength + 100))
+
+        let text = try #require(log.entries.first?.text)
+        #expect(text.hasPrefix(String(repeating: "x", count: MessageLog.maxTextLength)))
+        #expect(text.hasSuffix("… (100 more characters)"))
+    }
 }

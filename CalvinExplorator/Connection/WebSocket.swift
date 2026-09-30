@@ -10,17 +10,26 @@ nonisolated enum WebSocketEvent: Sendable {
 
 /// One WebSocket connection attempt, backed by `URLSessionWebSocketTask`
 nonisolated final class WebSocket: GatewaySocket {
+    /// Real messages are ~150 bytes. A bigger frame is a bug or an attack, and fails the connection
+    static let maximumMessageSize = 64 * 1024
+    /// Events the main actor hasn't picked up yet beyond this many are dropped, oldest first
+    static let maximumBufferedEvents = 1000
+
     let events: AsyncThrowingStream<WebSocketEvent, Error>
     private let task: URLSessionWebSocketTask
 
     init(url: URL) {
-        let (events, continuation) = AsyncThrowingStream.makeStream(of: WebSocketEvent.self)
+        let (events, continuation) = AsyncThrowingStream.makeStream(
+            of: WebSocketEvent.self,
+            bufferingPolicy: .bufferingNewest(Self.maximumBufferedEvents)
+        )
         let session = URLSession(
             configuration: .ephemeral,
             delegate: OpenDelegate(continuation: continuation),
             delegateQueue: nil
         )
         let task = session.webSocketTask(with: url)
+        task.maximumMessageSize = Self.maximumMessageSize
         self.events = events
         self.task = task
 
