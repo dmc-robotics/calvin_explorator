@@ -51,6 +51,8 @@ final class TelemetryStore {
     }
 
     private func apply(_ payload: IMUPayload, at time: Date) {
+        let values = [payload.ax, payload.ay, payload.az, payload.gx, payload.gy, payload.gz, payload.mx, payload.my, payload.mz]
+        guard SensorLimits.arePlausible(values) else { return }
         let reading = IMUReading(
             time: time,
             accel: Vector3(x: payload.ax ?? 0, y: payload.ay ?? 0, z: payload.az ?? 0),
@@ -65,14 +67,16 @@ final class TelemetryStore {
 
     private func apply(_ payload: I2CHealthPayload, at time: Date) {
         i2cHealth.record(
-            nacks: payload.nacks ?? 0,
-            timeouts: payload.timeouts ?? 0,
-            resets: payload.resets ?? 0,
+            nacks: Int(payload.nacks ?? 0),
+            timeouts: Int(payload.timeouts ?? 0),
+            resets: Int(payload.resets ?? 0),
             at: time
         )
     }
 
     private func apply(_ payload: BalancePayload, at time: Date) {
+        let values = [payload.tilt, payload.tiltRate, payload.targetVel, payload.motorL, payload.motorR]
+        guard SensorLimits.arePlausible(values) else { return }
         balance.record(BalanceSample(
             time: time,
             tilt: payload.tilt,

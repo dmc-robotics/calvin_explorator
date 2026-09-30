@@ -15,11 +15,11 @@ struct TelemetryStoreTests {
         #expect(store.tofRear.history.samples.isEmpty)
     }
 
-    @Test func imuRoutesBySource() {
+    @Test func imuRoutesBySource() throws {
         store.handle(message: #"{"topic":"sensor.imu","data":{"ax":0.1,"ay":-0.02,"az":0.98,"gx":1,"gy":2,"gz":3}}"#)
         store.handle(message: #"{"topic":"sensor.imu","data":{"source":"oakd","ax":0.5}}"#)
 
-        let balancer = try! #require(store.imuBalancer.latest)
+        let balancer = try #require(store.imuBalancer.latest)
         #expect(balancer.accel == Vector3(x: 0.1, y: -0.02, z: 0.98))
         #expect(balancer.gyro == Vector3(x: 1, y: 2, z: 3))
         // Missing fields read as zero
@@ -37,12 +37,12 @@ struct TelemetryStoreTests {
         #expect(store.i2cHealth.status == .warning)
     }
 
-    @Test func balanceTelemetryFromProtocolExample() {
+    @Test func balanceTelemetryFromProtocolExample() throws {
         // Example line from cogitator's PROTOCOL.md, as the gateway wraps it
         let message = #"{"topic":"sensor.telemetry","data":{"type":"telemetry","ms":12345,"tilt":1.23,"tiltRate":-0.45,"targetVel":0.0,"motorL":0.0,"motorR":0.0,"loopCount":12345}}"#
         store.handle(message: message)
 
-        let latest = try! #require(store.balance.latest)
+        let latest = try #require(store.balance.latest)
         #expect(latest.tilt == 1.23)
         #expect(latest.tiltRate == -0.45)
         #expect(latest.loopCount == 12345)
@@ -53,13 +53,22 @@ struct TelemetryStoreTests {
         #"{"topic":"sensor.tof"}"#,
         #"{"topic":"sensor.telemetry","data":{"tilt":1}}"#,
         #"{"topic":"instinctus.log","data":{"level":"INFO","msg":"heartbeat"}}"#,
+        // Values that would crash or break charts if accepted
+        #"{"topic":"sensor.tof","data":{"front":1e300,"rear":-5}}"#,
+        #"{"topic":"sensor.i2c_health","data":{"nacks":9223372036854775807,"timeouts":1}}"#,
+        #"{"topic":"sensor.i2c_health","data":{"nacks":-1}}"#,
+        #"{"topic":"sensor.imu","data":{"ax":1e300}}"#,
+        #"{"topic":"sensor.telemetry","data":{"tilt":-1e300,"tiltRate":0,"targetVel":0,"motorL":0,"motorR":0,"loopCount":1}}"#,
     ])
-    func ignoresMalformedAndUnknownMessages(message: String) {
+    func ignoresMalformedUnknownAndImplausibleMessages(message: String) {
         store.handle(message: message)
 
-        #expect(store.tofFront.rangeStatus == .noData)
+        #expect(!store.tofFront.hasData)
+        #expect(!store.tofRear.hasData)
         #expect(store.balance.latest == nil)
-        #expect(store.i2cHealth.status == .noData)
+        #expect(!store.i2cHealth.hasData)
+        #expect(store.imuBalancer.latest == nil)
+        #expect(store.imuOakD.latest == nil)
     }
 }
 
@@ -74,15 +83,35 @@ struct SensorModelTests {
         #expect(ToFSensor.rangeStatus(for: distance) == expected)
     }
 
-    @Test func tofWarnsForCloseReadingsOnly() {
+    @Test(arguments: [
+        (0.0, ObstacleAlert.close),
+        (30, .close),
+        (199, .close),
+        (200, .none),
+        (1500, .none),
+    ])
+    func tofObstacleAlert(distance: Double, expected: ObstacleAlert) {
+        let now = Date.now
         var sensor = ToFSensor()
-        #expect(!sensor.isObstacleWarning)
+        sensor.record(distance: distance, at: now)
+        #expect(sensor.obstacleAlert(at: now) == expected)
+    }
 
-        sensor.record(distance: 30, at: .now)
-        #expect(sensor.isObstacleWarning)
+    @Test func tofAlertGoesStaleWithoutNewReadings() {
+        let start = Date.now
+        var sensor = ToFSensor()
+        #expect(sensor.obstacleAlert(at: start) == .none)
 
-        sensor.record(distance: Double(ToFSensor.warningDistance), at: .now)
-        #expect(!sensor.isObstacleWarning)
+        sensor.record(distance: 1500, at: start)
+        #expect(sensor.obstacleAlert(at: start + ToFSensor.staleAfter) == .none)
+        #expect(sensor.obstacleAlert(at: start + ToFSensor.staleAfter + 0.1) == .stale)
+    }
+
+    @Test func tofIgnoresUnreportableDistances() {
+        var sensor = ToFSensor()
+        sensor.record(distance: 70_000, at: .now)
+        sensor.record(distance: -1, at: .now)
+        #expect(!sensor.hasData)
     }
 
     @Test(arguments: [
@@ -113,5 +142,23 @@ struct SensorModelTests {
     ])
     func batteryTone(percent: Int, expected: StatusTone) {
         #expect(BatteryStatus(percent: percent).tone == expected)
+    }
+
+    @Test func sensorLimits() {
+        #expect(SensorLimits.arePlausible([1, -1, nil, SensorLimits.maximumMagnitude]))
+        #expect(!SensorLimits.arePlausible([1, SensorLimits.maximumMagnitude * 2]))
+    }
+}
+
+struct ServicesStoreTests {
+    @Test func savesAndRestoresSwitches() throws {
+        let testDefaults = TestDefaults()
+        let service = try #require(ServicesStore.definitions.first)
+
+        let store = ServicesStore(defaults: testDefaults.defaults)
+        #expect(store.isEnabled(service) == service.enabledByDefault)
+        store.setEnabled(true, for: service)
+
+        #expect(ServicesStore(defaults: testDefaults.defaults).isEnabled(service))
     }
 }

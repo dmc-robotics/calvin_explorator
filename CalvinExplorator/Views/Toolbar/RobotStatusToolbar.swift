@@ -14,10 +14,8 @@ struct RobotStatusToolbar: ToolbarContent {
                     lastError: model.connection.lastError,
                     retry: model.connection.retry
                 )
-                ObstacleWarnings(
-                    front: model.telemetry.tofFront.isObstacleWarning,
-                    rear: model.telemetry.tofRear.isObstacleWarning
-                )
+                // Reads ToF data itself, so new readings only redraw this view
+                ObstacleWarnings(telemetry: model.telemetry)
             }
             .padding(.horizontal, 8)
             // Grow when the Retry button or obstacle warnings appear instead of truncating them
@@ -111,25 +109,41 @@ struct ConnectionIndicator: View {
     }
 }
 
-/// Red warnings when a ToF sensor sees something too close
+/// Per ToF sensor: red when something is too close, gray when its readings have gone stale
 struct ObstacleWarnings: View {
-    let front: Bool
-    let rear: Bool
+    /// How often staleness is re-checked when no new readings arrive
+    private static let refreshInterval: TimeInterval = 1
+
+    let telemetry: TelemetryStore
 
     var body: some View {
-        if front || rear {
-            HStack(spacing: 8) {
-                if front { warning("Front") }
-                if rear { warning("Rear") }
+        TimelineView(.periodic(from: .now, by: Self.refreshInterval)) { context in
+            let front = telemetry.tofFront.obstacleAlert(at: context.date)
+            let rear = telemetry.tofRear.obstacleAlert(at: context.date)
+            if front != .none || rear != .none {
+                HStack(spacing: 8) {
+                    alert(front, side: "Front")
+                    alert(rear, side: "Rear")
+                }
+                .labelStyle(.titleAndIcon)
+                .font(.callout.weight(.medium))
             }
-            .foregroundStyle(.red)
         }
     }
 
-    private func warning(_ side: String) -> some View {
-        Label(side, systemImage: "exclamationmark.triangle.fill")
-            .labelStyle(.titleAndIcon)
-            .font(.callout.weight(.medium))
-            .help("\(side) obstacle closer than \(ToFSensor.warningDistance) mm")
+    @ViewBuilder
+    private func alert(_ alert: ObstacleAlert, side: String) -> some View {
+        switch alert {
+        case .none:
+            EmptyView()
+        case .close:
+            Label(side, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .help("\(side) obstacle closer than \(ToFSensor.warningDistance) mm")
+        case .stale:
+            Label(side, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.secondary)
+                .help("No \(side.lowercased()) ToF reading for over \(Int(ToFSensor.staleAfter)) s")
+        }
     }
 }

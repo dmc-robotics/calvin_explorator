@@ -39,10 +39,11 @@ struct IMUPayload: Decodable {
     let mx, my, mz: Double?
 }
 
+/// Counts are `UInt16` so negative or absurd values fail to decode and the message is ignored
 struct I2CHealthPayload: Decodable {
-    let nacks: Int?
-    let timeouts: Int?
-    let resets: Int?
+    let nacks: UInt16?
+    let timeouts: UInt16?
+    let resets: UInt16?
 }
 
 /// Field names follow the serial protocol
@@ -53,4 +54,18 @@ struct BalancePayload: Decodable {
     let motorL: Double
     let motorR: Double
     let loopCount: Int
+}
+
+/// Sanity limit for sensor values the protocol doesn't bound. Anything bigger is corrupt data;
+/// it's rejected so it can't break chart scaling
+enum SensorLimits {
+    static let maximumMagnitude = 1_000_000.0
+
+    /// True when every present value is finite and within `maximumMagnitude`
+    static func arePlausible(_ values: [Double?]) -> Bool {
+        values.allSatisfy { value in
+            guard let value else { return true }
+            return value.isFinite && abs(value) <= maximumMagnitude
+        }
+    }
 }

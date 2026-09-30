@@ -9,6 +9,7 @@ struct Timeline<Sample> {
     private(set) var samples: [Sample] = []
 
     init(capacity: Int = Self.defaultCapacity) {
+        precondition(capacity > 0, "Timeline capacity must be positive")
         self.capacity = capacity
     }
 
