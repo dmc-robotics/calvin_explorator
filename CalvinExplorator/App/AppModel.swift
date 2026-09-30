@@ -4,6 +4,12 @@ import Observation
 /// App-wide state: the cogitator connection and everything fed by it
 @Observable
 final class AppModel {
+    /// Received messages are applied in batches this often, so the UI redraws at this rate
+    /// rather than once per message (instinctus alone sends 50 per second)
+    static let refreshInterval: Duration = .milliseconds(100)
+
+    private static let selectedPageKey = "selectedPage"
+
     let connection = CogitatorConnection()
     let telemetry = TelemetryStore()
     let messageLog = MessageLog()
@@ -17,11 +23,6 @@ final class AppModel {
     }
     var isStopAlertPresented = false
     private(set) var endpoint: CogitatorEndpoint
-
-    private static let selectedPageKey = "selectedPage"
-    /// Received messages are applied in batches this often, so the UI redraws at this rate
-    /// rather than once per message (instinctus alone sends 50 per second)
-    private static let refreshInterval: Duration = .milliseconds(100)
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var pendingMessages: [(text: String, time: Date)] = []
@@ -56,16 +57,22 @@ final class AppModel {
         connection.connect(to: url)
     }
 
-    /// Sends `{"topic": topic, "data": data}` to cogitator and logs it. Returns false when not connected
+    /// Sends `{"topic": topic, "data": data}` to cogitator. Logs it as sent only once the send
+    /// succeeds, and as failed otherwise. Returns whether it was sent
     @discardableResult
-    func send(topic: String, data: some Encodable) -> Bool {
+    func send(topic: String, data: some Encodable) async -> Bool {
         guard let json = try? JSONEncoder().encode(GatewayEnvelope(topic: topic, data: data)) else { return false }
         let text = String(decoding: json, as: UTF8.self)
-        guard connection.send(text) else { return false }
         // Keep the log in order: anything received before this goes first
         flushPendingMessages()
-        messageLog.record(.sent, text)
-        return true
+        do {
+            try await connection.send(text)
+            messageLog.record(.sent, text)
+            return true
+        } catch {
+            messageLog.record(.sendFailed, "\(text) — \(error.localizedDescription)")
+            return false
+        }
     }
 
     /// STOP is UI-only for now: cogitator's gateway doesn't accept commands yet, so nothing is sent
@@ -73,17 +80,22 @@ final class AppModel {
         isStopAlertPresented = true
     }
 
+    // MARK: - Receiving (internal for tests)
+
     /// Queues a message, keeping its arrival time, and schedules a flush if none is pending
-    private func receive(_ text: String) {
+    func receive(_ text: String) {
         pendingMessages.append((text, .now))
         guard flushTask == nil else { return }
         flushTask = Task {
             try? await Task.sleep(for: Self.refreshInterval)
+            // Cancelled when send() already flushed; a newer task owns the next batch
+            guard !Task.isCancelled else { return }
             flushPendingMessages()
         }
     }
 
-    private func flushPendingMessages() {
+    /// Logs and applies everything received since the last flush
+    func flushPendingMessages() {
         flushTask?.cancel()
         flushTask = nil
         for message in pendingMessages {

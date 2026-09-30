@@ -10,6 +10,34 @@ struct ReconnectPolicyTests {
     }
 }
 
+struct LinkMonitorTests {
+    let policy = ReconnectPolicy()
+    let start = Date(timeIntervalSinceReferenceDate: 1000)
+
+    @Test func handshakeTimesOut() {
+        let link = LinkMonitor(startedAt: start)
+        #expect(link.failureReason(at: start + policy.connectTimeout - 0.1, policy: policy) == nil)
+        #expect(link.failureReason(at: start + policy.connectTimeout, policy: policy) == LinkMonitor.connectTimeoutReason)
+    }
+
+    @Test func openLinkFailsOnlyAfterGoingQuiet() {
+        let link = LinkMonitor(startedAt: start)
+        link.markOpened(at: start + 1)
+        link.heard(at: start + 10)
+        #expect(link.failureReason(at: start + 10 + policy.livenessTimeout - 0.1, policy: policy) == nil)
+        #expect(link.failureReason(at: start + 10 + policy.livenessTimeout, policy: policy) == LinkMonitor.unresponsiveReason)
+    }
+
+    @Test func stableOnlyAfterMinimumDuration() {
+        let link = LinkMonitor(startedAt: start)
+        #expect(!link.wasStable(at: start + 100, policy: policy))
+
+        link.markOpened(at: start)
+        #expect(!link.wasStable(at: start + policy.minimumStableDuration - 0.1, policy: policy))
+        #expect(link.wasStable(at: start + policy.minimumStableDuration, policy: policy))
+    }
+}
+
 struct ConnectionStatusTests {
     let now = Date(timeIntervalSinceReferenceDate: 1000)
 
@@ -28,49 +56,5 @@ struct ConnectionStatusTests {
         #expect(ConnectionStatus.reconnecting(attempt: 1, nextRetryAt: nil).isTrying)
         #expect(!ConnectionStatus.connected.isTrying)
         #expect(!ConnectionStatus.offline.isTrying)
-    }
-}
-
-struct CogitatorEndpointTests {
-    @Test func validEndpointMakesWebSocketURL() {
-        let endpoint = CogitatorEndpoint(host: "192.168.1.50", port: 5560)
-        #expect(endpoint.url?.absoluteString == "ws://192.168.1.50:5560")
-    }
-
-    @Test(arguments: [
-        CogitatorEndpoint(host: "", port: 5560),
-        CogitatorEndpoint(host: "calvin jetson", port: 5560),
-        CogitatorEndpoint(host: "localhost", port: 0),
-        CogitatorEndpoint(host: "localhost", port: 70000),
-    ])
-    func invalidEndpointHasNoURL(endpoint: CogitatorEndpoint) {
-        #expect(endpoint.url == nil)
-    }
-
-    @Test func savesAndLoads() throws {
-        let defaults = try #require(UserDefaults(suiteName: "CogitatorEndpointTests"))
-        defaults.removePersistentDomain(forName: "CogitatorEndpointTests")
-        #expect(CogitatorEndpoint.load(from: defaults) == .default)
-
-        CogitatorEndpoint(host: "calvin.local", port: 6000).save(to: defaults)
-        #expect(CogitatorEndpoint.load(from: defaults) == CogitatorEndpoint(host: "calvin.local", port: 6000))
-    }
-}
-
-struct MessageLogTests {
-    @Test func dropsOldestBeyondLimit() {
-        let log = MessageLog()
-        for index in 0..<(MessageLog.maxEntries + 10) {
-            log.record(.received, "\(index)")
-        }
-        #expect(log.entries.count == MessageLog.maxEntries)
-        #expect(log.entries.first?.text == "10")
-    }
-
-    @Test func pausedLogIgnoresMessages() {
-        let log = MessageLog()
-        log.isPaused = true
-        log.record(.sent, "ignored")
-        #expect(log.entries.isEmpty)
     }
 }

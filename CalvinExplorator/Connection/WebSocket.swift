@@ -8,12 +8,8 @@ nonisolated enum WebSocketEvent: Sendable {
     case message(String)
 }
 
-/// One WebSocket connection attempt.
-///
-/// `events` yields `.opened`, then each received message, and finishes (throwing the failure)
-/// when the socket closes or fails to connect. Ending iteration early — for example by
-/// cancelling the task that iterates — closes the socket.
-nonisolated final class WebSocket: Sendable {
+/// One WebSocket connection attempt, backed by `URLSessionWebSocketTask`
+nonisolated final class WebSocket: GatewaySocket {
     let events: AsyncThrowingStream<WebSocketEvent, Error>
     private let task: URLSessionWebSocketTask
 
@@ -28,7 +24,15 @@ nonisolated final class WebSocket: Sendable {
         self.events = events
         self.task = task
 
-        let receiveLoop = Task {
+        // Set before anything can finish the stream, so cleanup always runs.
+        // Cancelling the task also makes the receive loop below throw and exit
+        continuation.onTermination = { _ in
+            task.cancel(with: .goingAway, reason: nil)
+            // Releases the delegate, which the session holds strongly
+            session.invalidateAndCancel()
+        }
+
+        Task {
             do {
                 while true {
                     switch try await task.receive() {
@@ -45,18 +49,15 @@ nonisolated final class WebSocket: Sendable {
             }
         }
 
-        continuation.onTermination = { _ in
-            receiveLoop.cancel()
-            task.cancel(with: .goingAway, reason: nil)
-            // Releases the delegate, which the session holds strongly
-            session.invalidateAndCancel()
-        }
-
         task.resume()
     }
 
     func send(_ text: String) async throws {
         try await task.send(.string(text))
+    }
+
+    func sendPing(onPong: @escaping @Sendable (Error?) -> Void) {
+        task.sendPing(pongReceiveHandler: onPong)
     }
 
     func close() {

@@ -5,6 +5,8 @@ struct LogEntry: Identifiable {
     enum Direction {
         case sent
         case received
+        /// A send that failed; the text includes the error
+        case sendFailed
     }
 
     let id: Int

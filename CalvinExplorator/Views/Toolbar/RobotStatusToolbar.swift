@@ -102,8 +102,11 @@ struct ConnectionIndicator: View {
 
     private var helpText: String {
         var text = "Cogitator at \(endpoint.displayName)"
-        if let lastError, status != .connected {
-            text += "\n\(lastError)"
+        switch status {
+        case .reconnecting, .offline:
+            if let lastError { text += "\n\(lastError)" }
+        default:
+            break
         }
         return text
     }

@@ -74,12 +74,28 @@ private struct LogRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(entry.time, format: Self.timeFormat)
                 .foregroundStyle(.secondary)
-            Text(entry.direction == .sent ? "TX" : "RX")
-                .foregroundStyle(entry.direction == .sent ? Color.accentColor : .green)
+            Text(directionLabel)
+                .foregroundStyle(directionColor)
             Text(entry.text)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.system(.caption, design: .monospaced))
+    }
+
+    private var directionLabel: String {
+        switch entry.direction {
+        case .sent: "TX"
+        case .received: "RX"
+        case .sendFailed: "TX!"
+        }
+    }
+
+    private var directionColor: Color {
+        switch entry.direction {
+        case .sent: .accentColor
+        case .received: .green
+        case .sendFailed: .red
+        }
     }
 }
 
