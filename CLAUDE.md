@@ -57,13 +57,14 @@ Launch arguments go into UserDefaults, so `-selectedPage telemetry` opens a spec
 ```
 CalvinExplorator/
 ├── App/            CalvinExploratorApp (scenes), AppModel (app-wide state), Page (sidebar), AppCommands (menus)
-├── Connection/     WebSocket (one socket), CogitatorConnection (reconnect loop), ReconnectPolicy,
-│                   ConnectionStatus, CogitatorEndpoint (host/port + persistence), GatewayMessage (topics, payloads)
+├── Connection/     GatewaySocket (protocol) + WebSocket (real socket), CogitatorConnection (reconnect loop + watchdog),
+│                   LinkMonitor (timeouts), ReconnectPolicy, ConnectionStatus, CogitatorEndpoint (host/port + persistence),
+│                   GatewayMessage (topics, payloads, SensorLimits)
 ├── Models/         Value types: Timeline, ToFSensor, I2CHealth, IMUSensor, BalanceState, BatteryStatus, PlaceholderSpectrum
 ├── Stores/         TelemetryStore (parses gateway messages), MessageLog (Logger page), ServicesStore
 └── Views/          ContentView (NavigationSplitView + toolbar), one folder per page, Components/ (Card, Metric,
                     StatusBadge, SeriesChart, Layout constants), Toolbar/ (battery, connection, obstacle warnings, STOP)
-CalvinExploratorTests/   Swift Testing suites for stores, models, and connection logic
+CalvinExploratorTests/   Swift Testing suites; `FakeSocket` in TestSupport.swift drives CogitatorConnection with millisecond timings
 Config/Info.plist        Extra Info.plist keys
 ```
 
@@ -84,11 +85,14 @@ To handle a new topic: add a case to `Topic`, a `Decodable` payload struct, a mo
 
 ## Key Behaviors
 
-- **Connection:** `CogitatorConnection` retries with backoff 1s → 2s → 4s … capped at 30s, goes **Offline** after 5 consecutive failures (manual Retry in the toolbar, or Robot ▸ Reconnect ⇧⌘R). 5s handshake timeout. Host/port are set in Settings (⌘,) and saved in UserDefaults
+- **Connection:** `CogitatorConnection` retries with backoff 1s → 2s → 4s … capped at 30s, goes **Offline** after 5 consecutive failures (manual Retry in the toolbar, or Robot ▸ Reconnect ⇧⌘R). Only a connection that stayed open ≥5s resets the count, so a gateway that accepts and drops clients still ends up offline. Host/port are set in Settings (⌘,) and saved in UserDefaults; the host must be a hostname, IPv4, or bracketed IPv6 address
+- **Dead-link detection:** a watchdog (`LinkMonitor`, every 1s) closes the socket if the handshake takes >5s or an open connection hears nothing — no message and no pong — for 5s, and pings it otherwise. Pings (answered automatically by Python `websockets`) keep a quiet-but-alive gateway connected, e.g. when the Teensy is unplugged
+- **Untrusted input:** frames over 64 KB fail the connection; I2C counts decode as `UInt16`; ToF distances outside 0–65535 mm and other readings beyond ±1,000,000 (`SensorLimits`) are ignored. Backlogs are capped (socket buffer 1000 events, `AppModel` 2000 pending messages — drops are counted in the Logger header) and log entries are cut at 4096 characters
+- **Obstacle warnings:** red when a ToF reading is under 200 mm (0 included), gray "stale" when a sensor hasn't reported for 2s (including after a disconnect)
 - **UI refresh batching:** `AppModel` queues received messages and applies them every 100 ms (`refreshInterval`). Charts redraw at that rate instead of per message — this matters for CPU (instinctus alone sends 50 msg/s)
 - **Charts:** use `SeriesChart` (vectorized `LinePlot`/`AreaPlot`). Timelines plot seconds relative to the newest sample. Colors come from `ChartStyle`: accent color for single series, red/green/blue for X/Y/Z
 - **Logger:** a `List` (table-backed; a `LazyVStack` was ~4× more CPU at 5000 rows). Keeps the newest 5000 messages; pause stops recording
-- **STOP** (toolbar, Robot ▸ Emergency Stop ⌘.): **UI only** — shows an alert that nothing was sent. Wire it up once the gateway accepts commands; `AppModel.send(topic:data:)` is the send path (logs TX)
+- **STOP** (toolbar, Robot ▸ Emergency Stop ⌘.): **UI only** — shows an alert that nothing was sent. Wire it up once the gateway accepts commands; `AppModel.send(topic:data:)` is the send path (async; logs TX only after the send succeeds, TX! in red if it fails). Before it sends anything safety-related, plan for an ack from instinctus (`instinctus.ack`) and some gateway authentication — today anything on the LAN can pose as cogitator
 - **Dashboard command box:** Return sends, Option-Return inserts a newline. Sending just clears the box for now
 
 ## Placeholders (dummy data until real sources exist)
