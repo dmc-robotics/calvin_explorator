@@ -43,7 +43,7 @@ private struct I2CHealthCard: View {
             let samples = health.history.samples
             if samples.count > 1 {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Error Timeline (NACKs + Timeouts)")
+                    Text("Error Timeline (NACKs + Timeouts + Resets)")
                         .font(.subheadline.weight(.medium))
                     SeriesChart(
                         series: [
@@ -53,7 +53,7 @@ private struct I2CHealthCard: View {
                                 filled: true,
                                 timeline: samples,
                                 time: \.time,
-                                value: { Double($0.nacks + $0.timeouts) }
+                                value: { Double($0.nacks + $0.timeouts + $0.resets) }
                             ),
                         ],
                         xTitle: "Seconds Ago",

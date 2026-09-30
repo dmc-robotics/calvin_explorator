@@ -20,8 +20,8 @@ final class AppModel {
     let battery = BatteryStatus.placeholder()
 
     /// Restored on launch. Also settable with the launch argument `-selectedPage <page>`
-    var selectedPage: Page? {
-        didSet { defaults.set(selectedPage?.rawValue, forKey: Self.selectedPageKey) }
+    var selectedPage: Page {
+        didSet { defaults.set(selectedPage.rawValue, forKey: Self.selectedPageKey) }
     }
     var isStopAlertPresented = false
     private(set) var endpoint: CogitatorEndpoint

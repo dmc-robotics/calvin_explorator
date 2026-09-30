@@ -6,10 +6,10 @@ struct ContentView: View {
 
     var body: some View {
         @Bindable var model = model
-        let page = model.selectedPage ?? .dashboard
+        let page = model.selectedPage
 
         NavigationSplitView {
-            List(Page.allCases, selection: $model.selectedPage) { page in
+            List(Page.allCases, selection: sidebarSelection) { page in
                 Label(page.title, systemImage: page.systemImage)
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
@@ -29,6 +29,16 @@ struct ContentView: View {
         } message: {
             Text("Nothing was sent to Calvin. Cogitator's gateway doesn't accept commands yet.")
         }
+    }
+
+    /// Ignores deselection (⌘-click on the selected row) so a page is always selected
+    private var sidebarSelection: Binding<Page?> {
+        Binding(
+            get: { model.selectedPage },
+            set: { newPage in
+                if let newPage { model.selectedPage = newPage }
+            }
+        )
     }
 }
 
