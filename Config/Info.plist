@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Keys that have no INFOPLIST_KEY_ build setting. Xcode merges these into the generated Info.plist. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Calvin Explorator connects to Calvin's cogitator on your local network to show telemetry and send commands.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Cogitator's gateway is plain ws:// on the local network -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>
