@@ -5,7 +5,7 @@
 **Calvin Explorator** is the human monitoring and control interface for Calvin, a self-balancing robot. This is the native macOS app (SwiftUI). It replaced an earlier Electron/Vue app and follows macOS conventions.
 
 **Calvin's Three-System Architecture:**
-- **instinctus** - Low-level reflexes and motor control (Teensy 4.1) - `~/code/arduino/calvin_instinctus/CLAUDE.md`
+- **instinctus** - Low-level reflexes and motor control (Teensy 4.1) - `../calvin_instinctus/CLAUDE.md`
 - **cogitator** - High-level AI and planning (Jetson Orin Nano) - `../calvin_cogitator/CLAUDE.md`, protocol in `../calvin_cogitator/PROTOCOL.md`
 - **explorator** (THIS SYSTEM) - Human monitoring interface
 
