@@ -1,19 +1,10 @@
-# Calvin Explorator (macOS) - Project Instructions
+# Calvin Explorator
 
-## System Overview
+Big picture (systems, wiring, working rules): see `../CLAUDE.md`.
 
-**Calvin Explorator** is the human monitoring and control interface for Calvin, a self-balancing robot. This is the native macOS app (SwiftUI). It replaced an earlier Electron/Vue app and follows macOS conventions.
+## Overview
 
-**Calvin's Three-System Architecture:**
-- **instinctus** - Low-level reflexes and motor control (Teensy 4.1) - `../calvin_instinctus/CLAUDE.md`
-- **cogitator** - High-level AI and planning (Jetson Orin Nano) - `../calvin_cogitator/CLAUDE.md`, protocol in `../calvin_cogitator/PROTOCOL.md`
-- **explorator** (THIS SYSTEM) - Human monitoring interface
-
-**Data Flow:**
-```
-Instinctus (serial JSON) → Cogitator (ZMQ bus → WebSocket gateway :5560) → Explorator
-Explorator → Cogitator → Instinctus   (not implemented yet — the gateway ignores inbound messages)
-```
+The native macOS (SwiftUI) monitoring and control app for Calvin. It follows macOS conventions. It connects to cogitator's WebSocket gateway (port 5560). Data flows in only: the gateway ignores inbound messages, so nothing the app sends reaches the robot yet.
 
 Single-user app for one personal Mac. Only needs to support macOS 27.
 
@@ -93,7 +84,6 @@ To handle a new topic: add a case to `Topic`, a `Decodable` payload struct, a mo
 - **Charts:** use `SeriesChart` (vectorized `LinePlot`/`AreaPlot`). Timelines plot seconds relative to the newest sample. Colors come from `ChartStyle`: accent color for single series, red/green/blue for X/Y/Z
 - **Logger:** a `List` (table-backed; a `LazyVStack` was ~4× more CPU at 5000 rows). Keeps the newest 5000 messages; pause stops recording
 - **STOP** (toolbar, Robot ▸ Emergency Stop ⌘.): **UI only** — shows an alert that nothing was sent. Wire it up once the gateway accepts commands; `AppModel.send(topic:data:)` is the send path (async; logs TX only after the send succeeds, TX! in red if it fails). Before it sends anything safety-related, plan for an ack from instinctus (`instinctus.ack`) and some gateway authentication — today anything on the LAN can pose as cogitator
-- **Dashboard command box:** Return sends, Option-Return inserts a newline. Sending just clears the box for now
 
 ## Placeholders (dummy data until real sources exist)
 
@@ -111,4 +101,3 @@ To handle a new topic: add a case to `Topic`, a `Decodable` payload struct, a mo
 - Named constants instead of magic numbers (`Layout`, `ChartStyle`, static lets on models)
 - Keep models as plain value types with the threshold logic as `static func`s so it's unit-testable
 - Match the surrounding code's comment density and naming; avoid abbreviations in new names
-- **Git** — the user handles all commits and pushes unless they explicitly ask Claude to. When asked to commit, keep the message short and put the model name in parentheses at the end, e.g. `Add balance card (Opus 5.5)`. Don't add a "Co-Authored-By" or "Generated with Claude Code" line
