@@ -1,37 +1,9 @@
-# Calvin Explorator for macOS
+# The Calvin Robot Project: Calvin Exploritor
 
-Native macOS monitoring console for Calvin, the self-balancing robot. It connects to cogitator's WebSocket gateway (`ws://<host>:5560`) and shows live balance, IMU, ToF, and I2C data, plus a raw message log.
+Calvin is a two-wheeled self-balancing robot with on board AI processing and computer vision. The code for the project is broken into four repos:
 
-Replaces the earlier Electron app.
+- **Calvin Instinctus**: This Repo. Code for the Teensy 4.1. This provides for Calvin's low level functionality and safety.
+- **Calvin Cogitator**: Code that runs on the Jetson. This is Calvin's high level thought.
+- **Calvin Explorator**: A native macOS app for monitoring Calvin from a Mac.
 
-## Requirements
-
-- macOS 27
-- Xcode 27
-
-## Build and run
-
-Open `CalvinExplorator.xcodeproj` and press ⌘R, or:
-
-```bash
-xcodebuild -project CalvinExplorator.xcodeproj -scheme CalvinExplorator build
-xcodebuild -project CalvinExplorator.xcodeproj -scheme CalvinExplorator test
-```
-
-Set the cogitator host and port in **Calvin Explorator ▸ Settings… (⌘,)**. The default is `localhost:5560`.
-
-To try it without the robot, run cogitator with dummy data:
-
-```bash
-cd ../calvin_cogitator/cogitator && ./run.sh --dummy
-```
-
-## Keyboard shortcuts
-
-| Shortcut | Action |
-|---|---|
-| ⌘1 – ⌘6 | Dashboard, Services, Telemetry, Motor Control, Diagnostics, Logger |
-| ⌃⌘S | Show/hide sidebar |
-| ⌘. | STOP (UI only for now) |
-| ⇧⌘R | Reconnect to cogitator |
-| ⌘, | Settings |
+This is a work in progress. 
