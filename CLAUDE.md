@@ -1,10 +1,10 @@
 # Calvin Explorator
 
-Big picture (systems, wiring, working rules): see `../CLAUDE.md`.
+Calvin is a robotics project contained in `~/code/robotics/calvin/`. See `~/code/robotics/calvin/CLAUDE.md` for project level information. This file is for `calvin_explorator` infromation only.
 
 ## Overview
 
-The native macOS (SwiftUI) monitoring and control app for Calvin. It follows macOS conventions. It connects to cogitator's WebSocket gateway (port 5560). Data flows in only: the gateway ignores inbound messages, so nothing the app sends reaches the robot yet.
+The native macOS (SwiftUI) monitoring and control app for Calvin. It follows macOS conventions. It connects to cogitator's WebSocket gateway.
 
 Single-user app for one personal Mac. Only needs to support macOS 27.
 
@@ -100,4 +100,4 @@ To handle a new topic: add a case to `Topic`, a `Decodable` payload struct, a mo
 - Menu shortcuts: ⌘1–⌘6 switch pages, ⌃⌘S toggles the sidebar, ⌘. STOP, ⇧⌘R reconnect
 - Named constants instead of magic numbers (`Layout`, `ChartStyle`, static lets on models)
 - Keep models as plain value types with the threshold logic as `static func`s so it's unit-testable
-- Match the surrounding code's comment density and naming; avoid abbreviations in new names
+- Match the surrounding code's comment density and naming.
